@@ -26,12 +26,12 @@ from pipeline import Pipeline
 
 cap = cv2.VideoCapture(0)
 
-
-
 class Application(DemoGUI, Pipeline):
 
     def __init__(self):
         super().__init__()
+        self.timer = 0
+        self.results = []  # Initialize a list to store the results
         self.video_loop()
 
     def show_frame(self, frame_rgb):
@@ -53,7 +53,7 @@ class Application(DemoGUI, Pipeline):
             return
 
         if len(self.pose_history) < 16:
-            logging.warnning("Video too short.")
+            logging.warning("Video too short.")
             self.reset_pipeline()
             return
 
@@ -70,8 +70,12 @@ class Application(DemoGUI, Pipeline):
         # Play mode: run translator.
         if self.is_play_mode:
             res_txt = self.translator_manager.run_knn(feats)
+            self.results.append(res_txt)  # Store result in the results list
+            self.record_btn_cb()
+            # Display all results in the console
             self.console_box.delete('1.0', 'end')
-            self.console_box.insert('end', f"Nearest class: {res_txt}\n")
+            #self.console_box.insert('end', f"Nearest class: {res_txt}\n")
+            self.console_box.insert('end', f"All results: {self.results}\n")  # Show all results
 
         # KNN-Record mode: save feats.
         else:
