@@ -145,3 +145,6 @@ hk_knn/
 knn_database/
 train_ckpts/
 data/
+/videos
+/videos
+*.xml
