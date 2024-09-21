@@ -1,17 +1,3 @@
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import logging
 import sys
 import time
@@ -19,6 +5,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import mediapipe as mp  # Importing Mediapipe
 
 from gui import DemoGUI
 from modules import utils
@@ -26,12 +13,28 @@ from pipeline import Pipeline
 
 cap = cv2.VideoCapture(0)
 
+# Initialize Mediapipe Hand detector
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 
 
 class Application(DemoGUI, Pipeline):
 
     def __init__(self):
         super().__init__()
+
+        self.results = []  # Initialize a list to store the results
+
+        # Set to Play Mode initially
+        self.is_play_mode = 1  # Set to 'Play mode' by default
+        self.notebook.select(1)  # Programmatically select the "Play mode" tab
+
+        # Update record button text to reflect play mode
+        self.record_btn_text.set("Record")
+
+        # Flag to check if hands are detected
+        self.hands_detected = False
+
         self.video_loop()
 
     def show_frame(self, frame_rgb):
@@ -53,7 +56,7 @@ class Application(DemoGUI, Pipeline):
             return
 
         if len(self.pose_history) < 16:
-            logging.warnning("Video too short.")
+            logging.warning("Video too short.")
             self.reset_pipeline()
             return
 
@@ -70,24 +73,26 @@ class Application(DemoGUI, Pipeline):
         # Play mode: run translator.
         if self.is_play_mode:
             res_txt = self.translator_manager.run_knn(feats)
+            self.results.append(res_txt)  # Store result in the results list
+            # Display all results in the console
             self.console_box.delete('1.0', 'end')
-            self.console_box.insert('end', f"Nearest class: {res_txt}\n")
+            # self.console_box.insert('end', f"Nearest class: {res_txt}\n")
+            self.console_box.insert('end', f"All results: {self.results}\n")  # Show all results
 
-        # KNN-Record mode: save feats.
+            # KNN-Record mode: save feats.
         else:
             self.knn_records.append(feats)
             self.num_records_text.set(f"num records: {len(self.knn_records)}")
-
     def save_btn_cb(self):
         super().save_btn_cb()
 
         # Read texbox entry, use as folder name.
         gloss_name = self.name_box.get()
 
-        if (gloss_name == ""):
+        if gloss_name == "":
             logging.error("Empty gloss name.")
             return
-        if (len(self.knn_records) < 0):
+        if len(self.knn_records) <= 0:
             logging.error("No knn record found.")
             return
 
@@ -100,13 +105,28 @@ class Application(DemoGUI, Pipeline):
         self.name_box.delete(0, 'end')
 
     def video_loop(self):
-
         ret, frame = cap.read()
         if not ret:
             logging.error("Camera frame not available.")
             self.close_all()
+
         frame = utils.crop_utils.crop_square(frame)
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Mediapipe Hand Detection
+        results = hands.process(frame_rgb)
+
+        # Check if hands are detected
+        self.hands_detected = results.multi_hand_landmarks is not None
+
+        if self.hands_detected:
+            cv2.putText(frame_rgb, "Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
+            if self.is_recording == False: self.record_btn_cb()
+
+        else:
+            cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
+            if self.is_recording == True: self.record_btn_cb()
+
         t1 = time.time()
 
         self.update(frame_rgb)
@@ -118,8 +138,8 @@ class Application(DemoGUI, Pipeline):
         self.root.after(1, self.video_loop)
 
     def close_all(self):
-
         cap.release()
+        hands.close()  # Close Mediapipe hand detection
         cv2.destroyAllWindows()
         sys.exit()
 
