@@ -147,3 +147,4 @@ train_ckpts/
 data/
 /videos
 /videos
+*.xml
