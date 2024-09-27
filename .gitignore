@@ -144,7 +144,7 @@ hk_knn/
 *.exe
 knn_database/
 train_ckpts/
-data/
 /videos
 /videos
 *.xml
+.idea/workspace.xml
