@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
