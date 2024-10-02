@@ -76,13 +76,13 @@ class Application(DemoGUI, Pipeline):
             self.results.append(res_txt)  # Store result in the results list
             # Display all results in the console
             self.console_box.delete('1.0', 'end')
-            # self.console_box.insert('end', f"Nearest class: {res_txt}\n")
             self.console_box.insert('end', f"All results: {self.results}\n")  # Show all results
 
             # KNN-Record mode: save feats.
         else:
             self.knn_records.append(feats)
             self.num_records_text.set(f"num records: {len(self.knn_records)}")
+
     def save_btn_cb(self):
         super().save_btn_cb()
 
@@ -126,6 +126,12 @@ class Application(DemoGUI, Pipeline):
         else:
             cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
             if self.is_recording == True: self.record_btn_cb()
+
+        # Display the latest prediction in red
+        if len(self.results) > 0:
+            latest_prediction = self.results[-1]  # Get the latest result
+            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1,
+                        (0, 0, 255), 2)
 
         t1 = time.time()
 
