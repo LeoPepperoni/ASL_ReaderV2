@@ -42,40 +42,11 @@ class Application(DemoGUI, Pipeline):
         # Initialize Flask app
         self.app = Flask(__name__)
         self.app.add_url_rule('/results', 'get_results',self.get_results)  # Calling this route will server results to the front-end
-        # Define the route to accept video data
-        self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
         # Start the Flask app in a separate thread
         threading.Thread(target=self.run_flask_app, daemon=True).start()
 
     def run_flask_app(self):
             self.app.run(host='0.0.0.0', port=8080)
-
-    def upload_video(self):
-        if 'video' not in request.files:
-            return jsonify({"error": "No video part in the request"}), 400
-
-        video_file = request.files['video']
-
-        if video_file.filename == '':
-            return jsonify({"error": "No video selected"}), 400
-
-        # Read the image as an OpenCV format
-        frame_bytes = np.frombuffer(frame_file.read(), np.uint8)
-        frame = cv2.imdecode(frame_bytes, cv2.IMREAD_COLOR)
-
-        vid_res = {
-            "pose_frames": np.stack(self.pose_history),
-            "face_frames": np.stack(self.face_history),
-            "lh_frames": np.stack(self.lh_history),
-            "rh_frames": np.stack(self.rh_history),
-            "n_frames": len(self.pose_history)
-        }
-        feats = self.translator_manager.get_feats(vid_res)
-        self.reset_pipeline()
-        threading.Thread(target=self.run_prediction, args=(feats,)).start()
-
-        # Return a response
-        return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
 
     def get_results(self):
         return jsonify(self.results)  # Return results as JSON
