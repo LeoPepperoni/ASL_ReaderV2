@@ -10,8 +10,6 @@ import mediapipe as mp  # Importing Mediapipe
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
-from flask import Flask, jsonify, request
-import threading
 
 cap = cv2.VideoCapture(0)
 
@@ -39,22 +37,9 @@ class Application(DemoGUI, Pipeline):
 
         self.video_loop()
 
-        # Initialize Flask app
-        self.app = Flask(__name__)
-        self.app.add_url_rule('/results', 'get_results',self.get_results)  # Calling this route will server results to the front-end
-
-        # Start the Flask app in a separate thread
-        threading.Thread(target=self.run_flask_app, daemon=True).start()
-
-    def run_flask_app(self):
-            self.app.run(host='0.0.0.0', port=8080)
-
-    def get_results(self):
-        return jsonify(self.results)  # Return results as JSON
-
     def show_frame(self, frame_rgb):
-            self.frame_rgb_canvas = frame_rgb
-            self.update_canvas()
+        self.frame_rgb_canvas = frame_rgb
+        self.update_canvas()
 
     def tab_btn_cb(self, event):
         super().tab_btn_cb(event)
@@ -64,7 +49,6 @@ class Application(DemoGUI, Pipeline):
             if not ret:
                 logging.error("KNN Sample is missing. Please record some samples before starting play mode.")
                 self.notebook.select(0)
-
 
     def record_btn_cb(self):
         super().record_btn_cb()
@@ -88,18 +72,17 @@ class Application(DemoGUI, Pipeline):
 
         # Play mode: run translator.
         if self.is_play_mode:
+            res_txt = self.translator_manager.run_knn(feats)
+            self.results.append(res_txt)  # Store result in the results list
+            # Display all results in the console
             self.console_box.delete('1.0', 'end')
-            threading.Thread(target=self.run_prediction, args=(feats,)).start()
+            self.console_box.insert('end', f"All results: {self.results}\n")  # Show all results
 
-            # Update the GUI in a thread-safe manner
+            # KNN-Record mode: save feats.
         else:
             self.knn_records.append(feats)
             self.num_records_text.set(f"num records: {len(self.knn_records)}")
 
-    def run_prediction(self, feats):
-        res_txt = self.translator_manager.run_knn(feats)
-        self.results.append(res_txt)  # Store result in the results list
-        self.console_box.insert('end', f"All results: {self.results}\n")
     def save_btn_cb(self):
         super().save_btn_cb()
 
@@ -144,6 +127,12 @@ class Application(DemoGUI, Pipeline):
             cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
             if self.is_recording == True: self.record_btn_cb()
 
+        # Display the latest prediction in red
+        if len(self.results) > 0:
+            latest_prediction = self.results[-1]  # Get the latest result
+            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1,
+                        (0, 0, 255), 2)
+
         t1 = time.time()
 
         self.update(frame_rgb)
@@ -153,11 +142,6 @@ class Application(DemoGUI, Pipeline):
         self.show_frame(frame_rgb)
 
         self.root.after(1, self.video_loop)
-
-    # def update_console(self):
-    #     # Display all results in the console
-    #     self.console_box.delete('1.0', 'end')
-    #     self.console_box.insert('end', f"All results: {self.results}\n")  # Show all results
 
     def close_all(self):
         cap.release()
