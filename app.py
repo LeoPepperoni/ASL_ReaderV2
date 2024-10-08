@@ -10,6 +10,7 @@ from pipeline import Pipeline
 from flask import Flask, jsonify, request
 import threading
 import random
+import os
 
 cap = cv2.VideoCapture(0)
 
@@ -38,7 +39,8 @@ hands_detected = False
 # Sample results
 # results = ["apple", "banana", "cherry", "date", "elderberry", "fig"]
 results = []
-
+UPLOAD_FOLDER = "videos/sample_video.mp4"
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/results', methods=["GET"])
 def get_results():
@@ -48,7 +50,7 @@ def get_results():
         return jsonify({"response": "No results to show"})  # Handle empty results
 
 
-@app.route("/upload", methods=["POST"])
+@app.route("/upload", methods=["POST"])# save the video from the fornt end and then send it to model
 def upload_video(self):
     if 'video' not in request.files:
         return jsonify({"error": "No video part in the request"}), 400
@@ -58,20 +60,12 @@ def upload_video(self):
     if video_file.filename == '':
         return jsonify({"error": "No video selected"}), 400
 
-    frame = utils.crop_utils.crop_square(video_file)
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # Ensure the upload folder exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-    vid_res = {
-        "pose_frames": np.stack(self.pose_history),
-        "face_frames": np.stack(self.face_history),
-        "lh_frames": np.stack(self.lh_history),
-        "rh_frames": np.stack(self.rh_history),
-        "n_frames": len(self.pose_history)
-    }
-
-    feats = self.translator_manager.get_feats(vid_res)
-    self.reset_pipeline()
-    threading.Thread(target=self.run_prediction, args=(feats,)).start()
+    # Save the video file to the specified path
+    video_file_path = os.path.join(app.config['UPLOAD_FOLDER'], video_file.filename)
+    video_file.save(video_file_path)
 
     # Return a response
     return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
@@ -86,17 +80,6 @@ def upload_video(self):
 # self.app.add_url_rule('/results', 'get_results', self.get_results)  # Calling this route will server results to the front-end
 # # Define the route to accept video data
 # self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
-
-def generate_fake_results(self, num_results=10):
-    """Generate fake results for testing."""
-    self.results = []
-    for _ in range(num_results):
-        fake_result = {
-            'label': random.choice(fake_words),  # Randomly select a word from the list
-            'confidence': round(random.uniform(0.5, 1.0), 2)  # Random confidence between 0.5 and 1.0
-        }
-        self.results.append(fake_result)
-
 
 def run_prediction(self, feats):
     res_txt = self.translator_manager.run_knn(feats)

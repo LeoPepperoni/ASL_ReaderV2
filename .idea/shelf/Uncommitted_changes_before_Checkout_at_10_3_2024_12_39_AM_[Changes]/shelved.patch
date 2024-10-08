@@ -1,0 +1,163 @@
+Index: webcam_demo.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import logging\r\nimport sys\r\nimport time\r\nfrom pathlib import Path\r\n\r\nimport cv2\r\nimport numpy as np\r\nimport mediapipe as mp  # Importing Mediapipe\r\n\r\nfrom gui import DemoGUI\r\nfrom modules import utils\r\nfrom pipeline import Pipeline\r\nfrom flask import Flask, jsonify, request\r\nimport threading\r\n\r\ncap = cv2.VideoCapture(0)\r\n\r\n# Initialize Mediapipe Hand detector\r\nmp_hands = mp.solutions.hands\r\nhands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)\r\n\r\n\r\nclass Application(DemoGUI, Pipeline):\r\n\r\n    def __init__(self):\r\n        super().__init__()\r\n\r\n        self.results = []  # Initialize a list to store the results\r\n\r\n        # Set to Play Mode initially\r\n        self.is_play_mode = 1  # Set to 'Play mode' by default\r\n        self.notebook.select(1)  # Programmatically select the \"Play mode\" tab\r\n\r\n        # Update record button text to reflect play mode\r\n        self.record_btn_text.set(\"Record\")\r\n\r\n        # Flag to check if hands are detected\r\n        self.hands_detected = False\r\n\r\n        self.video_loop()\r\n\r\n        # Initialize Flask app\r\n        self.app = Flask(__name__)\r\n        self.app.add_url_rule('/results', 'get_results',self.get_results)  # Calling this route will server results to the front-end\r\n\r\n        # Start the Flask app in a separate thread\r\n        threading.Thread(target=self.run_flask_app, daemon=True).start()\r\n\r\n    def run_flask_app(self):\r\n            self.app.run(host='0.0.0.0', port=8080)\r\n\r\n    def get_results(self):\r\n        return jsonify(self.results)  # Return results as JSON\r\n\r\n    def show_frame(self, frame_rgb):\r\n            self.frame_rgb_canvas = frame_rgb\r\n            self.update_canvas()\r\n\r\n    def tab_btn_cb(self, event):\r\n        super().tab_btn_cb(event)\r\n        # check database before change from record mode to play mode.\r\n        if self.is_play_mode:\r\n            ret = self.translator_manager.load_knn_database()\r\n            if not ret:\r\n                logging.error(\"KNN Sample is missing. Please record some samples before starting play mode.\")\r\n                self.notebook.select(0)\r\n\r\n\r\n    def record_btn_cb(self):\r\n        super().record_btn_cb()\r\n        if self.is_recording:\r\n            return\r\n\r\n        if len(self.pose_history) < 16:\r\n            logging.warning(\"Video too short.\")\r\n            self.reset_pipeline()\r\n            return\r\n\r\n        vid_res = {\r\n            \"pose_frames\": np.stack(self.pose_history),\r\n            \"face_frames\": np.stack(self.face_history),\r\n            \"lh_frames\": np.stack(self.lh_history),\r\n            \"rh_frames\": np.stack(self.rh_history),\r\n            \"n_frames\": len(self.pose_history)\r\n        }\r\n        feats = self.translator_manager.get_feats(vid_res)\r\n        self.reset_pipeline()\r\n\r\n        # Play mode: run translator.\r\n        if self.is_play_mode:\r\n            self.console_box.delete('1.0', 'end')\r\n            threading.Thread(target=self.run_prediction, args=(feats,)).start()\r\n\r\n            # Update the GUI in a thread-safe manner\r\n        else:\r\n            self.knn_records.append(feats)\r\n            self.num_records_text.set(f\"num records: {len(self.knn_records)}\")\r\n\r\n    def run_prediction(self, feats):\r\n        res_txt = self.translator_manager.run_knn(feats)\r\n        self.results.append(res_txt)  # Store result in the results list\r\n        self.console_box.insert('end', f\"All results: {self.results}\\n\")\r\n    def save_btn_cb(self):\r\n        super().save_btn_cb()\r\n\r\n        # Read texbox entry, use as folder name.\r\n        gloss_name = self.name_box.get()\r\n\r\n        if gloss_name == \"\":\r\n            logging.error(\"Empty gloss name.\")\r\n            return\r\n        if len(self.knn_records) <= 0:\r\n            logging.error(\"No knn record found.\")\r\n            return\r\n\r\n        self.translator_manager.save_knn_database(gloss_name, self.knn_records)\r\n\r\n        logging.info(\"database saved.\")\r\n        # clear.\r\n        self.knn_records = []\r\n        self.num_records_text.set(\"num records: \" + str(len(self.knn_records)))\r\n        self.name_box.delete(0, 'end')\r\n\r\n    def video_loop(self):\r\n        ret, frame = cap.read()\r\n        if not ret:\r\n            logging.error(\"Camera frame not available.\")\r\n            self.close_all()\r\n\r\n        frame = utils.crop_utils.crop_square(frame)\r\n        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)\r\n\r\n        # Mediapipe Hand Detection\r\n        results = hands.process(frame_rgb)\r\n\r\n        # Check if hands are detected\r\n        self.hands_detected = results.multi_hand_landmarks is not None\r\n\r\n        if self.hands_detected:\r\n            cv2.putText(frame_rgb, \"Hands Detected\", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)\r\n            if self.is_recording == False: self.record_btn_cb()\r\n\r\n        else:\r\n            cv2.putText(frame_rgb, \"No Hands Detected\", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)\r\n            if self.is_recording == True: self.record_btn_cb()\r\n\r\n        t1 = time.time()\r\n\r\n        self.update(frame_rgb)\r\n\r\n        t2 = time.time() - t1\r\n        cv2.putText(frame_rgb, \"{:.0f} ms\".format(t2 * 1000), (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (203, 52, 247), 1)\r\n        self.show_frame(frame_rgb)\r\n\r\n        self.root.after(1, self.video_loop)\r\n\r\n    # def update_console(self):\r\n    #     # Display all results in the console\r\n    #     self.console_box.delete('1.0', 'end')\r\n    #     self.console_box.insert('end', f\"All results: {self.results}\\n\")  # Show all results\r\n\r\n    def close_all(self):\r\n        cap.release()\r\n        hands.close()  # Close Mediapipe hand detection\r\n        cv2.destroyAllWindows()\r\n        sys.exit()\r\n\r\n\r\nif __name__ == \"__main__\":\r\n    app = Application()\r\n    app.root.mainloop()\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/webcam_demo.py b/webcam_demo.py
+--- a/webcam_demo.py	(revision c4977df9a98b4206dd8ff9c6f6cba00d7c75f47f)
++++ b/webcam_demo.py	(date 1727930354426)
+@@ -42,13 +42,41 @@
+         # Initialize Flask app
+         self.app = Flask(__name__)
+         self.app.add_url_rule('/results', 'get_results',self.get_results)  # Calling this route will server results to the front-end
+-
++        # Define the route to accept video data
++        self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
+         # Start the Flask app in a separate thread
+         threading.Thread(target=self.run_flask_app, daemon=True).start()
+ 
+     def run_flask_app(self):
+             self.app.run(host='0.0.0.0', port=8080)
+ 
++    def upload_video(self):
++        if 'video' not in request.files:
++            return jsonify({"error": "No video part in the request"}), 400
++
++        video_file = request.files['video']
++
++        if video_file.filename == '':
++            return jsonify({"error": "No video selected"}), 400
++
++        # Read the image as an OpenCV format
++        frame_bytes = np.frombuffer(frame_file.read(), np.uint8)
++        frame = cv2.imdecode(frame_bytes, cv2.IMREAD_COLOR)
++
++        vid_res = {
++            "pose_frames": np.stack(self.pose_history),
++            "face_frames": np.stack(self.face_history),
++            "lh_frames": np.stack(self.lh_history),
++            "rh_frames": np.stack(self.rh_history),
++            "n_frames": len(self.pose_history)
++        }
++        feats = self.translator_manager.get_feats(vid_res)
++        self.reset_pipeline()
++        threading.Thread(target=self.run_prediction, args=(feats,)).start()
++
++        # Return a response
++        return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
++
+     def get_results(self):
+         return jsonify(self.results)  # Return results as JSON
+ 
+@@ -96,10 +124,13 @@
+             self.knn_records.append(feats)
+             self.num_records_text.set(f"num records: {len(self.knn_records)}")
+ 
++
+     def run_prediction(self, feats):
+         res_txt = self.translator_manager.run_knn(feats)
+         self.results.append(res_txt)  # Store result in the results list
+         self.console_box.insert('end', f"All results: {self.results}\n")
++
++
+     def save_btn_cb(self):
+         super().save_btn_cb()
+ 
+@@ -121,6 +152,7 @@
+         self.num_records_text.set("num records: " + str(len(self.knn_records)))
+         self.name_box.delete(0, 'end')
+ 
++
+     def video_loop(self):
+         ret, frame = cap.read()
+         if not ret:
+Index: .idea/misc.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"Black\">\r\n    <option name=\"sdkName\" value=\"Python 3.9 (shuwa)\" />\r\n  </component>\r\n  <component name=\"ProjectRootManager\" version=\"2\" project-jdk-name=\"Python 3.9 (shuwa)\" project-jdk-type=\"Python SDK\" />\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/misc.xml b/.idea/misc.xml
+--- a/.idea/misc.xml	(revision c4977df9a98b4206dd8ff9c6f6cba00d7c75f47f)
++++ b/.idea/misc.xml	(date 1727929244360)
+@@ -4,4 +4,7 @@
+     <option name="sdkName" value="Python 3.9 (shuwa)" />
+   </component>
+   <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.9 (shuwa)" project-jdk-type="Python SDK" />
++  <component name="PyCharmProfessionalAdvertiser">
++    <option name="shown" value="true" />
++  </component>
+ </project>
+\ No newline at end of file
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"1dbc9192-71f8-4ef8-9dde-dbc70bc0edaf\" name=\"Changes\" comment=\"\">\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/workspace.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/workspace.xml\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/requirements.txt\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/requirements.txt\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"FileTemplateManagerImpl\">\r\n    <option name=\"RECENT_TEMPLATES\">\r\n      <list>\r\n        <option value=\"Python Script\" />\r\n      </list>\r\n    </option>\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 3\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"2mGtzJAPCGWpXmTNa9tL0TG3PSo\" />\r\n  <component name=\"ProjectLevelVcsManager\">\r\n    <ConfirmationsSetting value=\"2\" id=\"Add\" />\r\n  </component>\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\">{\r\n  &quot;keyToString&quot;: {\r\n    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,\r\n    &quot;Python.__init__.executor&quot;: &quot;Run&quot;,\r\n    &quot;Python.data_collection.executor&quot;: &quot;Run&quot;,\r\n    &quot;Python.file_utils.executor&quot;: &quot;Run&quot;,\r\n    &quot;Python.skeleton_utils.executor&quot;: &quot;Run&quot;,\r\n    &quot;Python.webcam_demo.executor&quot;: &quot;Run&quot;,\r\n    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,\r\n    &quot;git-widget-placeholder&quot;: &quot;Leos-Branch&quot;,\r\n    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,\r\n    &quot;last_opened_file_path&quot;: &quot;C:/Users/Leonardo/Desktop/shuwa/videos&quot;,\r\n    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,\r\n    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,\r\n    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,\r\n    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,\r\n    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;\r\n  }\r\n}</component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"CopyFile.RECENT_KEYS\">\r\n      <recent name=\"C:\\Users\\Leonardo\\Desktop\\shuwa\\videos\" />\r\n      <recent name=\"C:\\Users\\Leonardo\\Desktop\\shuwa\\assets\\videos\" />\r\n    </key>\r\n    <key name=\"MoveFile.RECENT_KEYS\">\r\n      <recent name=\"C:\\Users\\Leonardo\\Desktop\\ASL_ReaderV2\\videos\" />\r\n      <recent name=\"C:\\Users\\Leonardo\\Desktop\\shuwa\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"SharedIndexes\">\r\n    <attachedChunks>\r\n      <set>\r\n        <option value=\"bundled-js-predefined-d6986cc7102b-7c0b70fcd90d-JavaScript-PY-242.21829.153\" />\r\n        <option value=\"bundled-python-sdk-464836ebc622-b74155a9e76b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-242.21829.153\" />\r\n      </set>\r\n    </attachedChunks>\r\n  </component>\r\n  <component name=\"SpellCheckerSettings\" RuntimeDictionaries=\"0\" Folders=\"0\" CustomDictionaries=\"0\" DefaultDictionary=\"application-level\" UseSingleDictionary=\"true\" transferred=\"true\" />\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"1dbc9192-71f8-4ef8-9dde-dbc70bc0edaf\" name=\"Changes\" comment=\"\" />\r\n      <created>1726715002870</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1726715002870</updated>\r\n      <workItem from=\"1726715003913\" duration=\"896000\" />\r\n      <workItem from=\"1726715913220\" duration=\"280000\" />\r\n      <workItem from=\"1726716206670\" duration=\"1474000\" />\r\n      <workItem from=\"1726717716647\" duration=\"944000\" />\r\n      <workItem from=\"1726718686299\" duration=\"2530000\" />\r\n      <workItem from=\"1726722179186\" duration=\"50000\" />\r\n      <workItem from=\"1726795236509\" duration=\"2745000\" />\r\n      <workItem from=\"1726798050258\" duration=\"1354000\" />\r\n      <workItem from=\"1727116886232\" duration=\"141000\" />\r\n      <workItem from=\"1727451910947\" duration=\"1015000\" />\r\n    </task>\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n  </component>\r\n  <component name=\"com.intellij.coverage.CoverageDataManagerImpl\">\r\n    <SUITE FILE_PATH=\"coverage/ASL_ReaderV2$data_collection.coverage\" NAME=\"data_collection Coverage Results\" MODIFIED=\"1726846066990\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$\" />\r\n    <SUITE FILE_PATH=\"coverage/shuwa$file_utils.coverage\" NAME=\"file_utils Coverage Results\" MODIFIED=\"1726716325400\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$/modules/utils\" />\r\n    <SUITE FILE_PATH=\"coverage/shuwa$skeleton_utils.coverage\" NAME=\"skeleton_utils Coverage Results\" MODIFIED=\"1726717451407\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$/modules/utils\" />\r\n    <SUITE FILE_PATH=\"coverage/ASL_ReaderV2$webcam_demo.coverage\" NAME=\"webcam_demo Coverage Results\" MODIFIED=\"1727452543482\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$\" />\r\n    <SUITE FILE_PATH=\"coverage/shuwa$__init__.coverage\" NAME=\"__init__ Coverage Results\" MODIFIED=\"1726716334148\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$/modules/utils\" />\r\n    <SUITE FILE_PATH=\"coverage/shuwa$data_collection.coverage\" NAME=\"data_collection Coverage Results\" MODIFIED=\"1726718799799\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$\" />\r\n    <SUITE FILE_PATH=\"coverage/shuwa$webcam_demo.coverage\" NAME=\"webcam_demo Coverage Results\" MODIFIED=\"1726721212965\" SOURCE_PROVIDER=\"com.intellij.coverage.DefaultCoverageFileProvider\" RUNNER=\"coverage.py\" COVERAGE_BY_TEST_ENABLED=\"false\" COVERAGE_TRACING_ENABLED=\"false\" WORKING_DIRECTORY=\"$PROJECT_DIR$\" />\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision c4977df9a98b4206dd8ff9c6f6cba00d7c75f47f)
++++ b/.idea/workspace.xml	(date 1727929952257)
+@@ -5,8 +5,9 @@
+   </component>
+   <component name="ChangeListManager">
+     <list default="true" id="1dbc9192-71f8-4ef8-9dde-dbc70bc0edaf" name="Changes" comment="">
++      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/webcam_demo.py" beforeDir="false" afterPath="$PROJECT_DIR$/webcam_demo.py" afterDir="false" />
+     </list>
+     <option name="SHOW_DIALOG" value="false" />
+     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+@@ -34,27 +35,27 @@
+     <option name="hideEmptyMiddlePackages" value="true" />
+     <option name="showLibraryContents" value="true" />
+   </component>
+-  <component name="PropertiesComponent">{
+-  &quot;keyToString&quot;: {
+-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+-    &quot;Python.__init__.executor&quot;: &quot;Run&quot;,
+-    &quot;Python.data_collection.executor&quot;: &quot;Run&quot;,
+-    &quot;Python.file_utils.executor&quot;: &quot;Run&quot;,
+-    &quot;Python.skeleton_utils.executor&quot;: &quot;Run&quot;,
+-    &quot;Python.webcam_demo.executor&quot;: &quot;Run&quot;,
+-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+-    &quot;git-widget-placeholder&quot;: &quot;Leos-Branch&quot;,
+-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+-    &quot;last_opened_file_path&quot;: &quot;C:/Users/Leonardo/Desktop/shuwa/videos&quot;,
+-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
++  <component name="PropertiesComponent"><![CDATA[{
++  "keyToString": {
++    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
++    "Python.__init__.executor": "Run",
++    "Python.data_collection.executor": "Run",
++    "Python.file_utils.executor": "Run",
++    "Python.skeleton_utils.executor": "Run",
++    "Python.webcam_demo.executor": "Run",
++    "RunOnceActivity.ShowReadmeOnStart": "true",
++    "git-widget-placeholder": "main",
++    "ignore.virus.scanning.warn.message": "true",
++    "last_opened_file_path": "C:/Users/Leonardo/Desktop/shuwa/videos",
++    "node.js.detected.package.eslint": "true",
++    "node.js.detected.package.tslint": "true",
++    "node.js.selected.package.eslint": "(autodetect)",
++    "node.js.selected.package.tslint": "(autodetect)",
++    "nodejs_package_manager_path": "npm",
++    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
++    "vue.rearranger.settings.migration": "true"
+   }
+-}</component>
++}]]></component>
+   <component name="RecentsManager">
+     <key name="CopyFile.RECENT_KEYS">
+       <recent name="C:\Users\Leonardo\Desktop\shuwa\videos" />

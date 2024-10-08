@@ -3,16 +3,18 @@ import sys
 import time
 from pathlib import Path
 
+import threading
 import cv2
 import numpy as np
 import mediapipe as mp  # Importing Mediapipe
-
+import os
+from flask import Flask, jsonify, request
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
 
 # Path to the video file
-video_file_path = "videos/sample_video.mp4"  # Update this with the path to your video file
+video_file_path = "UPLOAD_FOLDER"  # Update this with the path to your video file
 
 # Initialize video file capture instead of webcam
 cap = cv2.VideoCapture(video_file_path)
@@ -40,6 +42,39 @@ class Application(DemoGUI, Pipeline):
         self.hands_detected = False
 
         self.video_loop()
+
+        # Initialize Flask & Define the routes
+        self.app = Flask(__name__)
+        self.app.add_url_rule('/results', 'get_results', self.get_results)  # Route to get results
+        self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
+
+        #Start Flask app on its own thread so it can run synchronously with our GUI
+        threading.Thread(target=self.run_flask_app, daemon=True).start()
+
+        #Ensure folder we want to save the video to exists
+        os.makedirs(self.app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    def run_flask_app(self):
+        self.app.run(debug=True, host='0.0.0.0', port=8080)
+
+    def get_results(self):
+        return jsonify({'response': self.results})  # Return results as JSON
+
+    def upload_video(self):
+        if 'video' not in request.files:
+            return jsonify({"error": "No video part in the request"}), 400
+
+        video_file = request.files['video']
+
+        if video_file.filename == '':
+            return jsonify({"error": "No video selected"}), 400
+
+        # Save the video file to the specified path
+        video_file_path = os.path.join(self.app.config['UPLOAD_FOLDER'], video_file.filename)
+        video_file.save(video_file_path)
+
+        # Return a response
+        return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
 
     def show_frame(self, frame_rgb):
         self.frame_rgb_canvas = frame_rgb
