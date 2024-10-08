@@ -16,8 +16,6 @@ from pipeline import Pipeline
 # Path to the video file
 video_file_path = "UPLOAD_FOLDER"  # Update this with the path to your video file
 
-# Initialize video file capture instead of webcam
-cap = cv2.VideoCapture(video_file_path)
 
 # Initialize Mediapipe Hand detector
 mp_hands = mp.solutions.hands
@@ -30,6 +28,8 @@ class Application(DemoGUI, Pipeline):
         super().__init__()
 
         self.results = []  # Initialize a list to store the results
+        # Initialize video file capture instead of webcam
+        self.cap = None
 
         # Set to Play Mode initially
         self.is_play_mode = 1  # Set to 'Play mode' by default
@@ -73,12 +73,14 @@ class Application(DemoGUI, Pipeline):
         video_path = os.path.join(self.app.config['UPLOAD_FOLDER'], video_file.filename)
         video_file.save(video_path)
 
+        self.cap = cv2.VideoCapture(video_path)
         # Return a response
         return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
 
     def show_frame(self, frame_rgb):
         self.frame_rgb_canvas = frame_rgb
         self.update_canvas()
+
 
     def tab_btn_cb(self, event):
         super().tab_btn_cb(event)
@@ -144,7 +146,7 @@ class Application(DemoGUI, Pipeline):
         self.name_box.delete(0, 'end')
 
     def video_loop(self):
-        ret, frame = cap.read()
+        ret, frame = self.cap.read()
         if not ret:
             logging.error("Video file finished or camera frame not available.")
             self.close_all()
