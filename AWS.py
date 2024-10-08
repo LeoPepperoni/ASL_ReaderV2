@@ -70,8 +70,8 @@ class Application(DemoGUI, Pipeline):
             return jsonify({"error": "No video selected"}), 400
 
         # Save the video file to the specified path
-        video_file_path = os.path.join(self.app.config['UPLOAD_FOLDER'], video_file.filename)
-        video_file.save(video_file_path)
+        video_path = os.path.join(self.app.config['UPLOAD_FOLDER'], video_file.filename)
+        video_file.save(video_path)
 
         # Return a response
         return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
