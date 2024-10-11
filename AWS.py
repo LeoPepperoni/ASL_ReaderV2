@@ -27,17 +27,11 @@ class Application(Pipeline):
     def __init__(self):
         super().__init__()
 
-        self.hands_out_of_frame_duration = .75
-        self.no_hands_time = None  # Variable to track time when hands are not detected
+        self.hands_out_of_frame_duration = 1  # Time threshold for hands being out of frame
         self.handless_start_time = None  # Timestamp for when hands go out of frame
 
         self.results = []  # Initialize a list to store the results
-
-        # Set to Play Mode initially
-
-        # Flag to check if hands are detected
-        self.hands_detected = False
-
+        self.hands_detected = False  # Flag to check if hands are detected
 
         # Initialize Flask & Define the routes
         self.app = Flask(__name__)
@@ -46,11 +40,7 @@ class Application(Pipeline):
         self.app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
         self.app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
-        #Start Flask app on its own thread so it can run synchronously with our GUI
-        #threading.Thread(target=self.run_flask_app, daemon=True).start()
-
         self.app.config['uploads'] = "uploads"
-        #Ensure folder we want to save the video to exists
         os.makedirs(self.app.config['uploads'], exist_ok=True)
 
     def run_flask_app(self):
@@ -63,31 +53,18 @@ class Application(Pipeline):
             return jsonify({'response': 'no results to show'})  # Return results as JSON
 
     def upload_video(self):
-        # if 'video' not in request.files:
-        #     return jsonify({"error": "No video part in the request"}), 400
-        #
-        # video_file = request.files['video']
-        #
-        # if video_file.filename == '':
-        #     return jsonify({"error": "No video selected"}), 400
-
-        # print(video_file.filename)
-        # video_path = os.path.join(self.app.config['UPLOAD_FOLDER'], video_file.filename)
-        #
-        # #Save Video to 'uploads'
-        # video_file.save(video_path)
         data = self.translator_manager.load_knn_database()
         video_file_path = os.path.join('uploads', 'Pleasehelpdad.mp4')
-        cap = cv2.VideoCapture(video_file_path)# reads in file from specified path
+        cap = cv2.VideoCapture(video_file_path)  # reads in file from specified path
 
         if not cap.isOpened():
             print(f"Error opening video file")
             return
         test = 0
-        while True: # will run until a condition breaks it
+        while True:  # will run until a condition breaks it
             ret, frame = cap.read()
 
-            if not ret: #condition to break out of the loop, if a frame is not returned
+            if not ret:  # condition to break out of the loop, if a frame is not returned
                 break
 
             frame = utils.crop_utils.crop_square(frame)
@@ -95,37 +72,41 @@ class Application(Pipeline):
 
             if frame.any() and test == 0:
                 print('received frame')
-                test +=1
+                test += 1
+
             # Mediapipe Hand Detection
             results = hands.process(frame_rgb)
 
             # Check if hands are detected
             self.hands_detected = results.multi_hand_landmarks is not None
 
-            if self.hands_detected and len(self.pose_history) >= 16: # run prediction, if hands have been detected before and the pose history is a sufficient size
-                vid_res = {
-                    "pose_frames": np.stack(self.pose_history),
-                    "face_frames": np.stack(self.face_history),
-                    "lh_frames": np.stack(self.lh_history),
-                    "rh_frames": np.stack(self.rh_history),
-                    "n_frames": len(self.pose_history)
-                }
-                feats = self.translator_manager.get_feats(vid_res)
+            if self.hands_detected:
+                self.handless_start_time = None  # Reset the timer if hands are detected
+            else:
+                # If hands are not detected, start or continue the timer
+                if self.handless_start_time is None:
+                    self.handless_start_time = time.time()  # Start the timer
+                elif time.time() - self.handless_start_time >= self.hands_out_of_frame_duration:
+                    # If hands have been out of frame for 0.75 seconds, make prediction
+                    if len(self.pose_history) >= 16:  # Ensure sufficient history
+                        vid_res = {
+                            "pose_frames": np.stack(self.pose_history),
+                            "face_frames": np.stack(self.face_history),
+                            "lh_frames": np.stack(self.lh_history),
+                            "rh_frames": np.stack(self.rh_history),
+                            "n_frames": len(self.pose_history)
+                        }
+                        feats = self.translator_manager.get_feats(vid_res)
 
-                if data:
-                    res_txt = self.translator_manager.run_knn(feats)
-                    self.results.append(res_txt)
-                    self.reset_pipeline()
+                        if data:
+                            res_txt = self.translator_manager.run_knn(feats)
+                            self.results.append(res_txt)
+                        self.reset_pipeline()
 
             self.update(frame_rgb)
         cap.release()
 
         return self.results
-
-        # self.video_loop()
-        # Return a response
-         #return jsonify({"message": f"Video uploaded successfully"}), 200
-
 
 if __name__ == "__main__":
     app = Application()
