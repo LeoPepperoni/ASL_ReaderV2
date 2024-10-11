@@ -27,7 +27,7 @@ class Application(Pipeline):
     def __init__(self):
         super().__init__()
 
-        self.hands_out_of_frame_duration = 1  # Time threshold for hands being out of frame
+        self.hands_out_of_frame_duration = 0.75  # Time threshold for hands being out of frame
         self.handless_start_time = None  # Timestamp for when hands go out of frame
 
         self.results = []  # Initialize a list to store the results
@@ -101,7 +101,7 @@ class Application(Pipeline):
                         if data:
                             res_txt = self.translator_manager.run_knn(feats)
                             self.results.append(res_txt)
-                        self.reset_pipeline()
+                            self.reset_pipeline()
 
             self.update(frame_rgb)
         cap.release()
