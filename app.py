@@ -40,7 +40,7 @@ hands_detected = False
 # results = ["apple", "banana", "cherry", "date", "elderberry", "fig"]
 results = []
 UPLOAD_FOLDER = "videos/sample_video.mp4"
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['uploads'] = UPLOAD_FOLDER
 
 @app.route('/results', methods=["GET"])
 def get_results():
@@ -61,10 +61,10 @@ def upload_video(self):
         return jsonify({"error": "No video selected"}), 400
 
     # Ensure the upload folder exists
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['uploads'], exist_ok=True)
 
     # Save the video file to the specified path
-    video_file_path = os.path.join(app.config['UPLOAD_FOLDER'], video_file.filename)
+    video_file_path = os.path.join(app.config['uploads'], video_file.filename)
     video_file.save(video_file_path)
 
     # Return a response

@@ -49,10 +49,49 @@ class Application(DemoGUI, Pipeline):
             if not ret:
                 logging.error("KNN Sample is missing. Please record some samples before starting play mode.")
                 self.notebook.select(0)
+    def video_loop(self):
+        ret, frame = cap.read() # read the video one frame at a time, if a frame is returned ret = True else false
+
+        if not ret: #If nothing is returned close all and exit loop
+            logging.error("Camera frame not available.")
+            self.close_all()
+
+        frame = utils.crop_utils.crop_square(frame)       # crops frame
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)# converts color
+
+        # Mediapipe Hand Detection
+        results = hands.process(frame_rgb)
+
+        # Check if hands are detected
+        self.hands_detected = results.multi_hand_landmarks is not None
+
+        if self.hands_detected: # if the hands are detected
+            cv2.putText(frame_rgb, "Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
+            if self.is_recording == False: self.record_btn_cb() # if GUI has detected hands before, but  is not recording at the moment call record btn function
+
+        else:
+            cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
+            if self.is_recording == True: self.record_btn_cb()
+
+        # Display the latest prediction in red
+        if len(self.results) > 0:
+            latest_prediction = self.results[-1]  # Get the latest result
+            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1,
+                        (0, 0, 255), 2)
+
+        t1 = time.time()
+
+        self.update(frame_rgb)# function appends landmark results to pose history based on frame
+
+        t2 = time.time() - t1
+        cv2.putText(frame_rgb, "{:.0f} ms".format(t2 * 1000), (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (203, 52, 247), 1)
+        self.show_frame(frame_rgb)
+
+        self.root.after(1, self.video_loop)
 
     def record_btn_cb(self):
         super().record_btn_cb()
-        if self.is_recording:
+        if self.is_recording: #still recording return until we gather more data
             return
 
         if len(self.pose_history) < 16:
@@ -60,7 +99,7 @@ class Application(DemoGUI, Pipeline):
             self.reset_pipeline()
             return
 
-        vid_res = {
+        vid_res = { #assign video results which are gathered from the update() function
             "pose_frames": np.stack(self.pose_history),
             "face_frames": np.stack(self.face_history),
             "lh_frames": np.stack(self.lh_history),
@@ -104,44 +143,7 @@ class Application(DemoGUI, Pipeline):
         self.num_records_text.set("num records: " + str(len(self.knn_records)))
         self.name_box.delete(0, 'end')
 
-    def video_loop(self):
-        ret, frame = cap.read()
-        if not ret:
-            logging.error("Camera frame not available.")
-            self.close_all()
 
-        frame = utils.crop_utils.crop_square(frame)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Mediapipe Hand Detection
-        results = hands.process(frame_rgb)
-
-        # Check if hands are detected
-        self.hands_detected = results.multi_hand_landmarks is not None
-
-        if self.hands_detected:
-            cv2.putText(frame_rgb, "Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
-            if self.is_recording == False: self.record_btn_cb()
-
-        else:
-            cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
-            if self.is_recording == True: self.record_btn_cb()
-
-        # Display the latest prediction in red
-        if len(self.results) > 0:
-            latest_prediction = self.results[-1]  # Get the latest result
-            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1,
-                        (0, 0, 255), 2)
-
-        t1 = time.time()
-
-        self.update(frame_rgb)
-
-        t2 = time.time() - t1
-        cv2.putText(frame_rgb, "{:.0f} ms".format(t2 * 1000), (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (203, 52, 247), 1)
-        self.show_frame(frame_rgb)
-
-        self.root.after(1, self.video_loop)
 
     def close_all(self):
         cap.release()

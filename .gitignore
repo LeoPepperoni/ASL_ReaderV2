@@ -37,7 +37,7 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit UPLOAD_FOLDER / coverage reports
+# Unit uploads / coverage reports
 htmlcov/
 .tox/
 .nox/
@@ -137,7 +137,7 @@ holistic_web_clean/node_modules/
 knn_dataset/
 classifier/im_dataset/
 knn_dataset-large/
-UPLOAD_FOLDER/
+uploads/
 knn_dataset_legacy/
 hk_knn/
 *.lnk
