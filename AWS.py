@@ -12,7 +12,7 @@ from modules import utils
 from pipeline import Pipeline
 
 # Path to the video file
-video_file_path = "videos/please/PleaseHelpDadTommorrow.mp4"  # Update this with the path to your video file
+video_file_path = "videos/please/PleaseHelpDad.mp4"  # Update this with the path to your video file
 
 # Initialize video file capture instead of webcam
 cap = cv2.VideoCapture(video_file_path)
@@ -35,7 +35,7 @@ class Application(DemoGUI, Pipeline):
         self.hands_detected = False
         self.no_hands_time = None  # Variable to track time when hands are not detected
 
-        self.hands_out_of_frame_duration = .5  # 1 second required for hands to be out of frame
+        self.hands_out_of_frame_duration = .75  # 1 second required for hands to be out of frame
         self.handless_start_time = None  # Timestamp for when hands go out of frame
 
         self.video_loop()
