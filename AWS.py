@@ -97,11 +97,12 @@ class Application(Pipeline):
                             "n_frames": len(self.pose_history)
                         }
                         feats = self.translator_manager.get_feats(vid_res)
+                        self.reset_pipeline()
 
                         if data:
                             res_txt = self.translator_manager.run_knn(feats)
+                            print(res_txt)
                             self.results.append(res_txt)
-                            self.reset_pipeline()
 
             self.update(frame_rgb)
         cap.release()
