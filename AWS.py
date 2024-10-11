@@ -71,7 +71,6 @@ class Application(Pipeline):
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             if frame.any() and test == 0:
-                print('received frame')
                 test += 1
 
             # Mediapipe Hand Detection
@@ -82,10 +81,12 @@ class Application(Pipeline):
 
             if self.hands_detected:
                 self.handless_start_time = None  # Reset the timer if hands are detected
+                self.update(frame_rgb)
             else:
                 # If hands are not detected, start or continue the timer
                 if self.handless_start_time is None:
                     self.handless_start_time = time.time()  # Start the timer
+
                 elif time.time() - self.handless_start_time >= self.hands_out_of_frame_duration:
                     # If hands have been out of frame for 0.75 seconds, make prediction
                     if len(self.pose_history) >= 16:  # Ensure sufficient history
@@ -96,15 +97,14 @@ class Application(Pipeline):
                             "rh_frames": np.stack(self.rh_history),
                             "n_frames": len(self.pose_history)
                         }
+
                         feats = self.translator_manager.get_feats(vid_res)
                         self.reset_pipeline()
 
                         if data:
                             res_txt = self.translator_manager.run_knn(feats)
-                            print(res_txt)
                             self.results.append(res_txt)
 
-            self.update(frame_rgb)
         cap.release()
 
         return self.results
