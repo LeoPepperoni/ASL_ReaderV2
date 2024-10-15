@@ -148,3 +148,5 @@ train_ckpts/
 /videos
 *.xml
 .idea/workspace.xml
+*.xml
+*.xml
