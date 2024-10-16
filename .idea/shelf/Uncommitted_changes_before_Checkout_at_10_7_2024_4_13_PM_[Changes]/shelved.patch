@@ -1,0 +1,60 @@
+Index: app.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import sys\r\n\r\nimport cv2\r\nimport numpy as np\r\nimport mediapipe as mp  # Importing Mediapipe\r\n\r\nfrom modules import utils\r\nfrom modules.translator import TranslatorManager\r\nfrom pipeline import Pipeline\r\nfrom flask import Flask, jsonify, request\r\nimport threading\r\nimport random\r\n\r\ncap = cv2.VideoCapture(0)\r\n\r\n# Initialize Mediapipe Hand detector\r\nmp_hands = mp.solutions.hands\r\nhands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)\r\n\r\nfake_words = [\r\n    \"apple\", \"banana\", \"cherry\", \"date\", \"elderberry\",\r\n    \"fig\", \"grape\", \"honeydew\", \"kiwi\", \"lemon\",\r\n    \"mango\", \"nectarine\", \"orange\", \"papaya\", \"quince\",\r\n    \"raspberry\", \"strawberry\", \"tangerine\", \"ugli\", \"vanilla\",\r\n    \"watermelon\", \"xigua\", \"yellowberry\", \"zucchini\"\r\n]\r\n\r\n# Initialize Flask app\r\napp = Flask(__name__)\r\n\r\npose_history = []\r\nface_history = []\r\nlh_history = []\r\nrh_history = []\r\ntranslator_manager = TranslatorManager()\r\nhands_detected = False\r\n\r\n# Sample results\r\n# results = [\"apple\", \"banana\", \"cherry\", \"date\", \"elderberry\", \"fig\"]\r\nresults = []\r\n\r\n\r\n@app.route('/results', methods=[\"GET\"])\r\ndef get_results():\r\n    if results:\r\n        return jsonify({\"response\": results})  # Remove the space in \"response\"\r\n    else:\r\n        return jsonify({\"response\": \"No results to show\"})  # Handle empty results\r\n\r\n\r\n@app.route(\"/upload\", methods=[\"POST\"])\r\ndef upload_video(self):\r\n    if 'video' not in request.files:\r\n        return jsonify({\"error\": \"No video part in the request\"}), 400\r\n\r\n    video_file = request.files['video']\r\n\r\n    if video_file.filename == '':\r\n        return jsonify({\"error\": \"No video selected\"}), 400\r\n\r\n    frame = utils.crop_utils.crop_square(video_file)\r\n    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)\r\n\r\n    vid_res = {\r\n        \"pose_frames\": np.stack(self.pose_history),\r\n        \"face_frames\": np.stack(self.face_history),\r\n        \"lh_frames\": np.stack(self.lh_history),\r\n        \"rh_frames\": np.stack(self.rh_history),\r\n        \"n_frames\": len(self.pose_history)\r\n    }\r\n\r\n    feats = self.translator_manager.get_feats(vid_res)\r\n    self.reset_pipeline()\r\n    threading.Thread(target=self.run_prediction, args=(feats,)).start()\r\n\r\n    # Return a response\r\n    return jsonify({\"message\": f\"Video {video_file.filename} uploaded successfully\"}), 200\r\n\r\n\r\n# class Application(Pipeline):\r\n\r\n# def __init__(self):\r\n#     super().__init__()\r\n\r\n\r\n# self.app.add_url_rule('/results', 'get_results', self.get_results)  # Calling this route will server results to the front-end\r\n# # Define the route to accept video data\r\n# self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])\r\n\r\ndef generate_fake_results(self, num_results=10):\r\n    \"\"\"Generate fake results for testing.\"\"\"\r\n    self.results = []\r\n    for _ in range(num_results):\r\n        fake_result = {\r\n            'label': random.choice(fake_words),  # Randomly select a word from the list\r\n            'confidence': round(random.uniform(0.5, 1.0), 2)  # Random confidence between 0.5 and 1.0\r\n        }\r\n        self.results.append(fake_result)\r\n\r\n\r\ndef run_prediction(self, feats):\r\n    res_txt = self.translator_manager.run_knn(feats)\r\n    self.results.append(res_txt)  # Store result in the results list\r\n\r\n\r\ndef close_all(self):\r\n    cap.release()\r\n    hands.close()  # Close Mediapipe hand detection\r\n    cv2.destroyAllWindows()\r\n    sys.exit()\r\n\r\n\r\nif __name__ == \"__main__\":\r\n    app.run(host='0.0.0.0', port=8080)\r\n
+===================================================================
+diff --git a/app.py b/app.py
+--- a/app.py	
++++ b/app.py	
+@@ -53,10 +53,10 @@
+     if 'video' not in request.files:
+         return jsonify({"error": "No video part in the request"}), 400
+ 
+-    video_file = request.files['video']
++    video_file = 'test/busy1.mp4'
+ 
+-    if video_file.filename == '':
+-        return jsonify({"error": "No video selected"}), 400
++    # if video_file.filename == '':
++    #     return jsonify({"error": "No video selected"}), 400
+ 
+     frame = utils.crop_utils.crop_square(video_file)
+     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+@@ -73,19 +73,12 @@
+     self.reset_pipeline()
+     threading.Thread(target=self.run_prediction, args=(feats,)).start()
+ 
++    if feats:
+     # Return a response
+-    return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
+-
+-
+-# class Application(Pipeline):
+-
+-# def __init__(self):
+-#     super().__init__()
++        return jsonify({"message": f"Video {video_file.filename} uploaded successfully"}), 200
++    else:
++        return jsonify({"message": f"Failed to work with video"}), 404
+ 
+-
+-# self.app.add_url_rule('/results', 'get_results', self.get_results)  # Calling this route will server results to the front-end
+-# # Define the route to accept video data
+-# self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
+ 
+ def generate_fake_results(self, num_results=10):
+     """Generate fake results for testing."""
+@@ -102,7 +95,6 @@
+     res_txt = self.translator_manager.run_knn(feats)
+     self.results.append(res_txt)  # Store result in the results list
+ 
+-
+ def close_all(self):
+     cap.release()
+     hands.close()  # Close Mediapipe hand detection
+@@ -111,4 +103,4 @@
+ 
+ 
+ if __name__ == "__main__":
+-    app.run(host='0.0.0.0', port=8080)
++    app.run(debug=True, host='0.0.0.0', port=8080)

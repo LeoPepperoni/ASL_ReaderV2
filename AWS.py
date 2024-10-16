@@ -2,152 +2,142 @@ import logging
 import sys
 import time
 from pathlib import Path
-
+import threading
 import cv2
 import numpy as np
 import mediapipe as mp  # Importing Mediapipe
-
+import os
+from flask import Flask, jsonify, request, Response
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
 
 # Path to the video file
-video_file_path = "videos/please/PleaseHelpDadTommorrow.mp4"  # Update this with the path to your video file
-
-# Initialize video file capture instead of webcam
-cap = cv2.VideoCapture(video_file_path)
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Initialize Mediapipe Hand detector
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 
 
-class Application(DemoGUI, Pipeline):
+class Application(Pipeline):
 
     def __init__(self):
         super().__init__()
 
-        self.results = []  # Initialize a list to store the results
-        self.is_play_mode = 1  # Set to 'Play mode' by default
-        self.notebook.select(1)  # Programmatically select the "Play mode" tab
-        self.record_btn_text.set("Record")
-
-        self.hands_detected = False
-        self.no_hands_time = None  # Variable to track time when hands are not detected
-
-        self.hands_out_of_frame_duration = .5  # 1 second required for hands to be out of frame
+        self.hands_out_of_frame_duration = 0.75  # Time threshold for hands being out of frame
         self.handless_start_time = None  # Timestamp for when hands go out of frame
 
-        self.video_loop()
+        self.results = []  # Initialize a list to store the results
+        self.hands_detected = False  # Flag to check if hands are detected
 
-    def show_frame(self, frame_rgb):
-        self.frame_rgb_canvas = frame_rgb
-        self.update_canvas()
+        # Initialize Flask & Define the routes
+        self.app = Flask(__name__)
+        self.app.add_url_rule('/results', 'get_results', self.get_results)  # Route to get results
+        self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
+        self.app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+        self.app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
-    def tab_btn_cb(self, event):
-        super().tab_btn_cb(event)
-        if self.is_play_mode:
-            ret = self.translator_manager.load_knn_database()
-            if not ret:
-                logging.error("KNN Sample is missing. Please record some samples before starting play mode.")
-                self.notebook.select(0)
+        self.app.config['uploads'] = "uploads"
+        os.makedirs(self.app.config['uploads'], exist_ok=True)
 
-    def record_btn_cb(self):
-        super().record_btn_cb()
-        if self.is_recording:
-            return
+    def run_flask_app(self):
+        self.app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
 
-        if len(self.pose_history) < 16:
-            logging.warning("Video too short.")
+    def get_results(self):
+        if self.results:
+            return jsonify({'response': self.results})  # Return results as JSON
+        else:
+            return jsonify({'response': 'no results to show'})  # Return results as JSON
+
+    def upload_video(self):
+        if 'file' not in request.files:
+            return jsonify({"error": "No file part in the request"}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+
+        video_file_path = os.path.join(self.app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(video_file_path)
+
+        cap = cv2.VideoCapture(video_file_path)  # reads in file from specified path
+
+        if not cap.isOpened():
+            return jsonify({"error": "Error opening video file"}), 500
+
+        while True:  # will run until a condition breaks it
+            ret, frame = cap.read()
+
+            if not ret:  # condition to break out of the loop, if a frame is not returned
+                break
+
+            frame = utils.crop_utils.crop_square(frame)
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Mediapipe Hand Detection
+            results = hands.process(frame_rgb)
+
+            # Check if hands are detected
+            self.hands_detected = results.multi_hand_landmarks is not None
+
+            if self.hands_detected:
+                self.handless_start_time = None  # Reset the timer if hands are detected
+                self.update(frame_rgb)
+            else:
+                # If hands are not detected, start or continue the timer
+                if self.handless_start_time is None:
+                    self.handless_start_time = time.time()  # Start the timer
+
+                elif time.time() - self.handless_start_time >= self.hands_out_of_frame_duration:
+                    # If hands have been out of frame for 0.75 seconds, make prediction
+                    if len(self.pose_history) >= 16:  # Ensure sufficient history
+                        vid_res = {
+                            "pose_frames": np.stack(self.pose_history),
+                            "face_frames": np.stack(self.face_history),
+                            "lh_frames": np.stack(self.lh_history),
+                            "rh_frames": np.stack(self.rh_history),
+                            "n_frames": len(self.pose_history)
+                        }
+
+                        feats = self.translator_manager.get_feats(vid_res)
+                        self.reset_pipeline()
+
+                        data = self.translator_manager.load_knn_database()
+                        if data:
+                            res_txt = self.translator_manager.run_knn(feats)
+                            self.results.append(res_txt)
+
+        # Ensure final prediction after the video ends if sufficient frames exist
+        if len(self.pose_history) >= 16:
+            vid_res = {
+                "pose_frames": np.stack(self.pose_history),
+                "face_frames": np.stack(self.face_history),
+                "lh_frames": np.stack(self.lh_history),
+                "rh_frames": np.stack(self.rh_history),
+                "n_frames": len(self.pose_history)
+            }
+
+            feats = self.translator_manager.get_feats(vid_res)
             self.reset_pipeline()
-            return
 
-        vid_res = {
-            "pose_frames": np.stack(self.pose_history),
-            "face_frames": np.stack(self.face_history),
-            "lh_frames": np.stack(self.lh_history),
-            "rh_frames": np.stack(self.rh_history),
-            "n_frames": len(self.pose_history)
-        }
-        feats = self.translator_manager.get_feats(vid_res)
-        self.reset_pipeline()
+            data = self.translator_manager.load_knn_database()
+            if data:
+                res_txt = self.translator_manager.run_knn(feats)
+                self.results.append(res_txt)
 
-        # Play mode: run translator.
-        if self.is_play_mode:
-            res_txt = self.translator_manager.run_knn(feats)
-            self.results.append(res_txt)
-            self.console_box.delete('1.0', 'end')
-            self.console_box.insert('end', f"All results: {self.results}\n")
-
-        else:
-            self.knn_records.append(feats)
-            self.num_records_text.set(f"num records: {len(self.knn_records)}")
-
-    def save_btn_cb(self):
-        super().save_btn_cb()
-
-        gloss_name = self.name_box.get()
-        if gloss_name == "":
-            logging.error("Empty gloss name.")
-            return
-        if len(self.knn_records) <= 0:
-            logging.error("No knn record found.")
-            return
-
-        self.translator_manager.save_knn_database(gloss_name, self.knn_records)
-        logging.info("database saved.")
-        self.knn_records = []
-        self.num_records_text.set("num records: " + str(len(self.knn_records)))
-        self.name_box.delete(0, 'end')
-
-    def video_loop(self):
-        ret, frame = cap.read()
-        if not ret:
-            logging.error("Video file finished or camera frame not available.")
-            self.close_all()
-
-        frame = utils.crop_utils.crop_square(frame)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        results = hands.process(frame_rgb)
-        self.hands_detected = results.multi_hand_landmarks is not None
-
-        if self.hands_detected:
-            self.handless_start_time = None  # Reset the timer
-            cv2.putText(frame_rgb, "Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
-            if not self.is_recording:
-                self.record_btn_cb()
-
-        else:
-            cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
-            if not self.handless_start_time:
-                self.handless_start_time = time.time()
-
-            if time.time() - self.handless_start_time >= self.hands_out_of_frame_duration:
-                if self.is_recording:
-                    self.record_btn_cb()
-
-        if len(self.results) > 0:
-            latest_prediction = self.results[-1]
-            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
-
-        t1 = time.time()
-
-        self.update(frame_rgb)
-
-        t2 = time.time() - t1
-        cv2.putText(frame_rgb, "{:.0f} ms".format(t2 * 1000), (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (203, 52, 247), 1)
-        self.show_frame(frame_rgb)
-
-        self.root.after(1, self.video_loop)
-
-    def close_all(self):
         cap.release()
-        hands.close()
-        cv2.destroyAllWindows()
-        sys.exit()
+
+        # Save the results before clearing them
+        response = jsonify(self.results)
+
+        # Clear the results to reset for the next video
+        self.results = []
+
+        return response
 
 
 if __name__ == "__main__":
     app = Application()
-    app.root.mainloop()
+    app.run_flask_app()

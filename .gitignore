@@ -37,7 +37,7 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
+# Unit uploads / coverage reports
 htmlcov/
 .tox/
 .nox/
@@ -137,7 +137,7 @@ holistic_web_clean/node_modules/
 knn_dataset/
 classifier/im_dataset/
 knn_dataset-large/
-test/
+uploads/
 knn_dataset_legacy/
 hk_knn/
 *.lnk
@@ -148,3 +148,5 @@ train_ckpts/
 /videos
 *.xml
 .idea/workspace.xml
+*.xml
+*.xml

@@ -11,7 +11,11 @@ from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
 
-cap = cv2.VideoCapture(0)
+# Path to the video file
+video_file_path = "videos/please/PleaseHelpDad.mp4"  # Update this with the path to your video file
+
+# Initialize video file capture instead of webcam
+cap = cv2.VideoCapture(video_file_path)
 
 # Initialize Mediapipe Hand detector
 mp_hands = mp.solutions.hands
@@ -24,16 +28,15 @@ class Application(DemoGUI, Pipeline):
         super().__init__()
 
         self.results = []  # Initialize a list to store the results
-
-        # Set to Play Mode initially
         self.is_play_mode = 1  # Set to 'Play mode' by default
         self.notebook.select(1)  # Programmatically select the "Play mode" tab
-
-        # Update record button text to reflect play mode
         self.record_btn_text.set("Record")
 
-        # Flag to check if hands are detected
         self.hands_detected = False
+        self.no_hands_time = None  # Variable to track time when hands are not detected
+
+        self.hands_out_of_frame_duration = .75  # 1 second required for hands to be out of frame
+        self.handless_start_time = None  # Timestamp for when hands go out of frame
 
         self.video_loop()
 
@@ -43,55 +46,15 @@ class Application(DemoGUI, Pipeline):
 
     def tab_btn_cb(self, event):
         super().tab_btn_cb(event)
-        # check database before change from record mode to play mode.
         if self.is_play_mode:
             ret = self.translator_manager.load_knn_database()
             if not ret:
                 logging.error("KNN Sample is missing. Please record some samples before starting play mode.")
                 self.notebook.select(0)
-    def video_loop(self):
-        ret, frame = cap.read() # read the video one frame at a time, if a frame is returned ret = True else false
-
-        if not ret: #If nothing is returned close all and exit loop
-            logging.error("Camera frame not available.")
-            self.close_all()
-
-        frame = utils.crop_utils.crop_square(frame)       # crops frame
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)# converts color
-
-        # Mediapipe Hand Detection
-        results = hands.process(frame_rgb)
-
-        # Check if hands are detected
-        self.hands_detected = results.multi_hand_landmarks is not None
-
-        if self.hands_detected: # if the hands are detected
-            cv2.putText(frame_rgb, "Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
-            if self.is_recording == False: self.record_btn_cb() # if GUI has detected hands before, but  is not recording at the moment call record btn function
-
-        else:
-            cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
-            if self.is_recording == True: self.record_btn_cb()
-
-        # Display the latest prediction in red
-        if len(self.results) > 0:
-            latest_prediction = self.results[-1]  # Get the latest result
-            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1,
-                        (0, 0, 255), 2)
-
-        t1 = time.time()
-
-        self.update(frame_rgb)# function appends landmark results to pose history based on frame
-
-        t2 = time.time() - t1
-        cv2.putText(frame_rgb, "{:.0f} ms".format(t2 * 1000), (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (203, 52, 247), 1)
-        self.show_frame(frame_rgb)
-
-        self.root.after(1, self.video_loop)
 
     def record_btn_cb(self):
         super().record_btn_cb()
-        if self.is_recording: #still recording return until we gather more data
+        if self.is_recording:
             return
 
         if len(self.pose_history) < 16:
@@ -99,7 +62,7 @@ class Application(DemoGUI, Pipeline):
             self.reset_pipeline()
             return
 
-        vid_res = { #assign video results which are gathered from the update() function
+        vid_res = {
             "pose_frames": np.stack(self.pose_history),
             "face_frames": np.stack(self.face_history),
             "lh_frames": np.stack(self.lh_history),
@@ -112,12 +75,10 @@ class Application(DemoGUI, Pipeline):
         # Play mode: run translator.
         if self.is_play_mode:
             res_txt = self.translator_manager.run_knn(feats)
-            self.results.append(res_txt)  # Store result in the results list
-            # Display all results in the console
+            self.results.append(res_txt)
             self.console_box.delete('1.0', 'end')
-            self.console_box.insert('end', f"All results: {self.results}\n")  # Show all results
+            self.console_box.insert('end', f"All results: {self.results}\n")
 
-            # KNN-Record mode: save feats.
         else:
             self.knn_records.append(feats)
             self.num_records_text.set(f"num records: {len(self.knn_records)}")
@@ -125,9 +86,7 @@ class Application(DemoGUI, Pipeline):
     def save_btn_cb(self):
         super().save_btn_cb()
 
-        # Read texbox entry, use as folder name.
         gloss_name = self.name_box.get()
-
         if gloss_name == "":
             logging.error("Empty gloss name.")
             return
@@ -136,18 +95,55 @@ class Application(DemoGUI, Pipeline):
             return
 
         self.translator_manager.save_knn_database(gloss_name, self.knn_records)
-
         logging.info("database saved.")
-        # clear.
         self.knn_records = []
         self.num_records_text.set("num records: " + str(len(self.knn_records)))
         self.name_box.delete(0, 'end')
 
+    def video_loop(self):
+        ret, frame = cap.read()
+        if not ret:
+            logging.error("Video file finished or camera frame not available.")
+            self.close_all()
 
+        frame = utils.crop_utils.crop_square(frame)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        results = hands.process(frame_rgb)
+        self.hands_detected = results.multi_hand_landmarks is not None
+
+        if self.hands_detected:
+            self.handless_start_time = None  # Reset the timer
+            cv2.putText(frame_rgb, "Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
+            if not self.is_recording:
+                self.record_btn_cb()
+
+        else:
+            cv2.putText(frame_rgb, "No Hands Detected", (10, 90), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
+            if not self.handless_start_time:
+                self.handless_start_time = time.time()
+
+            if time.time() - self.handless_start_time >= self.hands_out_of_frame_duration:
+                if self.is_recording:
+                    self.record_btn_cb()
+
+        if len(self.results) > 0:
+            latest_prediction = self.results[-1]
+            cv2.putText(frame_rgb, f"Prediction: {latest_prediction}", (10, 130), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), 2)
+
+        t1 = time.time()
+
+        self.update(frame_rgb)
+
+        t2 = time.time() - t1
+        cv2.putText(frame_rgb, "{:.0f} ms".format(t2 * 1000), (10, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (203, 52, 247), 1)
+        self.show_frame(frame_rgb)
+
+        self.root.after(1, self.video_loop)
 
     def close_all(self):
         cap.release()
-        hands.close()  # Close Mediapipe hand detection
+        hands.close()
         cv2.destroyAllWindows()
         sys.exit()
 

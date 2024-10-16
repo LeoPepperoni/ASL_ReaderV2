@@ -50,10 +50,10 @@ class Pipeline:
         if np.all(frame_res["pose_4d"] == 0.):
             return
 
-        if self.is_recording:
-            cv2.putText(frame_rgb, "Recording...", (10, 300), cv2.FONT_HERSHEY_DUPLEX, 2, (255, 0, 0), 1)
+        # if self.is_recording:
+        #     cv2.putText(frame_rgb, "Recording...", (10, 300), cv2.FONT_HERSHEY_DUPLEX, 2, (255, 0, 0), 1)
 
-            self.pose_history.append(frame_res["pose_4d"])
-            self.face_history.append(frame_res["face_3d"])
-            self.lh_history.append(frame_res["lh_3d"])
-            self.rh_history.append(frame_res["rh_3d"])
+        self.pose_history.append(frame_res["pose_4d"])
+        self.face_history.append(frame_res["face_3d"])
+        self.lh_history.append(frame_res["lh_3d"])
+        self.rh_history.append(frame_res["rh_3d"])
