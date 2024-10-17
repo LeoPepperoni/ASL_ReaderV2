@@ -1,18 +1,14 @@
-# Shuwa Gesture Toolkit
+# ASL Reader V2
 
-Shuwa (手話) is Japanese for "Sign Language"
+ASL Reader v2 is the second iteration of our modifications to an open-source machine learning model aimed at recognizing and classifying American Sign Language (ASL) gestures. The model uses video input data to classify various ASL signs based on saved training data, making it a valuable tool for real-time ASL interpretation.
 
-Shuwa Gesture Toolkit is a framework that detects and classifies arbitrary gestures in short videos. It is particularly useful for recognizing basic words in sign language. We collected thousands of example videos of people signing Japanese Sign Language (JSL) and Hong Kong Sign Language (HKSL) to train the baseline model for recognizing gestures and facial expressions.
+Our machine learning model is built using a K-Nearest Neighbor (KNN) algorithm, which classifies input video frames by comparing them to known ASL gesture examples. This version introduces several improvements in accuracy, performance, and user experience over the original implementation.
 
-The Shuwa Gesture Toolkit also allows you to train new gestures, so it can be trained to recognize any sign from any sign language in the world.
-
-[[Web Demo](https://shuwa-io-demo.uc.r.appspot.com/)]
+[[Web Demo](https://www.asl-live.com/)]
 
 # How it works
-
-![](assets/overview.jpg)  
+ 
 by combining the results of a [Holistic](https://google.github.io/mediapipe/solutions/holistic.html) model over multiple frames. We can create a reasonable set of requirements for interpreting sign language, which include body language, facial expression, and hand gestures.
-
 
 The next step is to predict the sign features vector using a classifier model. Lastly, output the class prediction using K-Nearest Neighbor classification.
 
@@ -37,15 +33,11 @@ python3 webcam_demo.py
 - Play mode.  
   ![play_mode](assets/play_mode.gif)
 
-# Try Hong Kong Sign Language or Japanese Sign Language
+#Run Flask app (built-in endpoints)
 
-1. Download [hksl_jsl_samples.zip](https://storage.googleapis.com/bit-studio-static/jobs/shuwa/hksl_jsl_samples.zip) 
-2. Extract to root directory
-3. run 
-    ```
-    python3 webcam_demo.py
-    ```
-
+```
+python3 AWS.py
+```
 
 # Train classifier
 
