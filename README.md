@@ -33,7 +33,7 @@ python3 webcam_demo.py
 - Play mode.  
   ![play_mode](assets/play_mode.gif)
 
-#Run Flask app (built-in endpoints)
+# Run Flask app (built-in endpoints)
 
 ```
 python3 AWS.py
