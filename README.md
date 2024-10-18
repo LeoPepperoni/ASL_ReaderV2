@@ -38,7 +38,7 @@ python3 webcam_demo.py
 ```
 python3 AWS.py
 ```
-- Running this file will launch an instance of the model locally that offers an endpoint that can me sent a video, and returns predictions upon recieveing sufficent data
+- Running this file will launch an instance of the model locally that offers an endpoint that can be sent a video, and returns predictions upon recieveing sufficent data
 
 # Train classifier
 
