@@ -11,6 +11,7 @@ from flask import Flask, jsonify, request, Response
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
+import ssl  # Added for HTTPS support
 
 # Path to the video file
 UPLOAD_FOLDER = 'uploads'
@@ -43,7 +44,12 @@ class Application(Pipeline):
         os.makedirs(self.app.config['uploads'], exist_ok=True)
 
     def run_flask_app(self):
-        self.app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
+        # Set the path to the SSL certificate and key
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(certfile='path/to/certfile.pem', keyfile='path/to/keyfile.pem')
+
+        # Run the Flask app with HTTPS
+        self.app.run(debug=True, host='0.0.0.0', port=8080, ssl_context=ssl_context, use_reloader=False)
 
     def get_results(self):
         if self.results:

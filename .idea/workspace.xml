@@ -5,8 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1dbc9192-71f8-4ef8-9dde-dbc70bc0edaf" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/ASL_ReaderV2.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/ASL_ReaderV2.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webcam_demo.py" beforeDir="false" afterPath="$PROJECT_DIR$/webcam_demo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AWS.py" beforeDir="false" afterPath="$PROJECT_DIR$/AWS.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -100,7 +102,9 @@
       <workItem from="1728400859008" duration="173000" />
       <workItem from="1728672091394" duration="1284000" />
       <workItem from="1729022602848" duration="1739000" />
-      <workItem from="1729260197227" duration="6000" />
+      <workItem from="1729260197227" duration="1066000" />
+      <workItem from="1729264256329" duration="679000" />
+      <workItem from="1729713954305" duration="472000" />
     </task>
     <servers />
   </component>
