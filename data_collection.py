@@ -10,8 +10,8 @@ from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
 
-video_folder = 'videos/your'  # Specify your video folder path here
-gloss_name = 'your'     # Specify your desired gloss name here
+video_folder = 'videos/tomorrow'  # Specify your video folder path here
+gloss_name = 'tomorrow'     # Specify your desired gloss name here
 
 class Application(DemoGUI, Pipeline):
 
