@@ -8,6 +8,7 @@ import numpy as np
 import mediapipe as mp  # Importing Mediapipe
 import os
 from flask import Flask, jsonify, request, Response
+from flask_cors import CORS  # Importing CORS for handling CORS errors
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
@@ -34,6 +35,7 @@ class Application(Pipeline):
 
         # Initialize Flask & Define the routes
         self.app = Flask(__name__)
+        CORS(self.app)  # Enable CORS for all routes
         self.app.add_url_rule('/results', 'get_results', self.get_results)  # Route to get results
         self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
         self.app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER

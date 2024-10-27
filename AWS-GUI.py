@@ -12,7 +12,7 @@ from modules import utils
 from pipeline import Pipeline
 
 # Path to the video file
-video_file_path = "videos/please/PleaseHelpDad.mp4"  # Update this with the path to your video file
+video_file_path = "uploads/PleaseHelpDad.mp4"  # Update this with the path to your video file
 
 # Initialize video file capture instead of webcam
 cap = cv2.VideoCapture(video_file_path)
