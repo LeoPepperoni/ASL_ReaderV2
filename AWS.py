@@ -27,7 +27,7 @@ class Application(Pipeline):
     def __init__(self):
         super().__init__()
 
-        self.hands_out_of_frame_duration = 0.75  # Time threshold for hands being out of frame
+        self.hands_out_of_frame_duration = 0.25  # Time threshold for hands being out of frame
         self.handless_start_time = None  # Timestamp for when hands go out of frame
 
         self.results = []  # Initialize a list to store the results

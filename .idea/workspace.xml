@@ -6,8 +6,12 @@
   <component name="ChangeListManager">
     <list default="true" id="1dbc9192-71f8-4ef8-9dde-dbc70bc0edaf" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/AWS-GUI.py" beforeDir="false" afterPath="$PROJECT_DIR$/AWS-GUI.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/AWS.py" beforeDir="false" afterPath="$PROJECT_DIR$/AWS.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/knn/dad.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/knn/help.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/knn/please.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/knn/tomorrow.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data_collection.py" beforeDir="false" afterPath="$PROJECT_DIR$/data_collection.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -69,11 +73,11 @@
       <recent name="C:\Users\Leonardo\Desktop\shuwa\assets\videos" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\food" />
       <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\tomorrow" />
-      <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\dad" />
-      <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\help" />
       <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\please" />
-      <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos" />
+      <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\help" />
+      <recent name="C:\Users\Leonardo\Desktop\ASL_ReaderV2\videos\dad" />
     </key>
   </component>
   <component name="SharedIndexes">
@@ -109,6 +113,8 @@
       <workItem from="1729991977791" duration="22000" />
       <workItem from="1729993198426" duration="1491000" />
       <workItem from="1729996654309" duration="4000" />
+      <workItem from="1730079929000" duration="1019000" />
+      <workItem from="1730126317633" duration="5302000" />
     </task>
     <servers />
   </component>
@@ -116,7 +122,7 @@
     <option name="version" value="3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/ASL_ReaderV2$data_collection.coverage" NAME="data_collection Coverage Results" MODIFIED="1729991435567" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/ASL_ReaderV2$data_collection.coverage" NAME="data_collection Coverage Results" MODIFIED="1730131412608" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/shuwa$file_utils.coverage" NAME="file_utils Coverage Results" MODIFIED="1726716325400" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/modules/utils" />
     <SUITE FILE_PATH="coverage/shuwa$skeleton_utils.coverage" NAME="skeleton_utils Coverage Results" MODIFIED="1726717451407" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/modules/utils" />
     <SUITE FILE_PATH="coverage/ASL_ReaderV2$webcam_demo.coverage" NAME="webcam_demo Coverage Results" MODIFIED="1727452543482" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
