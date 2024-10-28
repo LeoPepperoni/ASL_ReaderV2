@@ -150,3 +150,4 @@ train_ckpts/
 .idea/workspace.xml
 *.xml
 *.xml
+/.idea
