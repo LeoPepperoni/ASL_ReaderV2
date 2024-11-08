@@ -45,11 +45,11 @@ class Application(Pipeline):
 
     def run_flask_app(self):
         # Set the path to the SSL certificate and key
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(certfile='path/to/certfile.pem', keyfile='path/to/keyfile.pem')
+        #ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        #ssl_context.load_cert_chain(certfile='path/to/certfile.pem', keyfile='path/to/keyfile.pem')
 
         # Run the Flask app with HTTPS
-        self.app.run(debug=True, host='0.0.0.0', port=8080, ssl_context=ssl_context, use_reloader=False)
+        self.app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
 
     def get_results(self):
         if self.results:
