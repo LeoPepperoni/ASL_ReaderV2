@@ -8,10 +8,10 @@ import numpy as np
 import mediapipe as mp  # Importing Mediapipe
 import os
 from flask import Flask, jsonify, request, Response
+from flask_cors import CORS  # Importing CORS for handling CORS errors
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
-import ssl  # Added for HTTPS support
 
 # Path to the video file
 UPLOAD_FOLDER = 'uploads'
@@ -27,7 +27,7 @@ class Application(Pipeline):
     def __init__(self):
         super().__init__()
 
-        self.hands_out_of_frame_duration = 0.75  # Time threshold for hands being out of frame
+        self.hands_out_of_frame_duration = 0.25  # Time threshold for hands being out of frame
         self.handless_start_time = None  # Timestamp for when hands go out of frame
 
         self.results = []  # Initialize a list to store the results
@@ -35,20 +35,21 @@ class Application(Pipeline):
 
         # Initialize Flask & Define the routes
         self.app = Flask(__name__)
+        CORS(self.app)  # Enable CORS for all routes
         self.app.add_url_rule('/results', 'get_results', self.get_results)  # Route to get results
         self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
+        self.app.add_url_rule('/health', 'health_check', self.health_check, methods=['GET'])
         self.app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
         self.app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
         self.app.config['uploads'] = "uploads"
         os.makedirs(self.app.config['uploads'], exist_ok=True)
 
-    def run_flask_app(self):
-        # Set the path to the SSL certificate and key
-        #ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        #ssl_context.load_cert_chain(certfile='path/to/certfile.pem', keyfile='path/to/keyfile.pem')
+    def health_check(self):
+        # Check system status, return 200 if healthy
+        return "Healthy", 200
 
-        # Run the Flask app with HTTPS
+    def run_flask_app(self):
         self.app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
 
     def get_results(self):
