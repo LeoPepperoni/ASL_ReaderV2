@@ -4,14 +4,12 @@ import time
 from pathlib import Path
 import cv2
 import numpy as np
-
-
 from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
 
-video_folder = 'videos/your'  # Specify your video folder path here
-gloss_name = 'your'     # Specify your desired gloss name here
+video_folder = 'videos/see'  # Specify your video folder path here
+gloss_name = 'see'     # Specify your desired gloss name here
 
 class Application(DemoGUI, Pipeline):
 
