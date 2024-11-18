@@ -38,11 +38,16 @@ class Application(Pipeline):
         CORS(self.app)  # Enable CORS for all routes
         self.app.add_url_rule('/results', 'get_results', self.get_results)  # Route to get results
         self.app.add_url_rule('/upload_video', 'upload_video', self.upload_video, methods=['POST'])
+        self.app.add_url_rule('/health', 'health_check', self.health_check, methods=['GET'])
         self.app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
         self.app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
         self.app.config['uploads'] = "uploads"
         os.makedirs(self.app.config['uploads'], exist_ok=True)
+
+    def health_check(self):
+        # Check system status, return 200 if healthy
+        return "Healthy", 200
 
     def run_flask_app(self):
         self.app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
