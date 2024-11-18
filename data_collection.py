@@ -8,8 +8,8 @@ from gui import DemoGUI
 from modules import utils
 from pipeline import Pipeline
 
-video_folder = 'videos/food'  # Specify your video folder path here
-gloss_name = 'hungry'     # Specify your desired gloss name here
+video_folder = 'videos/see'  # Specify your video folder path here
+gloss_name = 'see'     # Specify your desired gloss name here
 
 class Application(DemoGUI, Pipeline):
 
